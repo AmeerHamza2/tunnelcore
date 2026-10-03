@@ -40,6 +40,5 @@ jobs:
       - run: make ios
       - uses: actions/setup-java@v4
         with: { distribution: temurin, java-version: '17' }
-      - uses: android-actions/setup-android@v3
-      - run: sdkmanager "ndk;26.1.10909125"
-      - run: ANDROID_NDK_HOME=$ANDROID_SDK_ROOT/ndk/26.1.10909125 make android
+      # macOS runners ship the Android SDK and NDK preinstalled.
+      - run: ANDROID_NDK_HOME=$ANDROID_NDK_LATEST_HOME make android
