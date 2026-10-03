@@ -1,0 +1,25 @@
+# Build output
+/build/
+/dist/
+*.aar
+*.jar
+*.xcframework/
+*.framework/
+
+# Go
+*.test
+*.out
+/vendor/
+
+# Fuzz corpus entries that reproduce a crash are committed deliberately;
+# the cached corpus is not.
+/packet/testdata/fuzz/*/.cache/
+
+# Local config that may contain real server credentials
+*.local.json
+*.local.conf
+.env
+
+# Local
+/tun-harness
+*.prof
