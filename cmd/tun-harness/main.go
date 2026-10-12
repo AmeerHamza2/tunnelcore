@@ -14,6 +14,7 @@
 //
 //	keygen     generate a WireGuard keypair (like `wg genkey | wg pubkey`)
 //	validate   check a mobile JSON config with the app's own parser
+//	probe      measure latency and loss to each server, as the server picker does
 //	demo       the in-process end-to-end showcase
 //	run        drive a real Linux tun interface from a JSON config (root)
 //
@@ -44,6 +45,7 @@ func commands() []command {
 	return []command{
 		{"keygen", "generate a WireGuard private key and print it with its public key", runKeygen},
 		{"validate", "validate a mobile JSON config exactly as the app would", runValidate},
+		{"probe", "measure latency and loss to each server in a config, as the app's server picker does", runProbe},
 		{"demo", "run the in-process end-to-end demo (no root needed)", runDemoCmd},
 		{"run", "drive a real tun interface from a JSON config (Linux, needs CAP_NET_ADMIN)", runTunCmd},
 	}
