@@ -117,4 +117,24 @@ client also uses. The engine handles utun's 4-byte address-family header.
 | `NetworkChanged()` | Coalesced. Reconnects with no backoff |
 | `IsUp()` | True only when traffic actually flows, never during reconnect |
 | `StatsJSON()` | Aggregates only: success rate, p50/p95, bytes, reconnects |
+| `ProbeServersJSON(timeoutMs)` | The user's own latency and loss to each server, best first, for the server picker. Blocking: call it off the main thread |
 | `GeneratePrivateKey()` / `PublicKeyFor()` | Device-side key generation |
+
+### Server picker with live latency
+
+The backend's server list says where servers are and whether they're healthy. Latency depends on
+where the *user* is, so the phone measures it:
+
+```kotlin
+// Off the main thread, e.g. when the picker opens.
+val json = tunnel.probeServersJSON(1000)
+// {"results":[{"name":"fra-01","protocol":"wireguard","method":"udp_echo","reachable":true,
+//              "rtt_ms":41.2,"rtt_p95_ms":55.0,"loss":0}, ...]}   best first; rtt_ms = -1 when down
+```
+
+- WireGuard servers are probed on the node's UDP echo port (`endpoint port + 1`), because WireGuard
+  never answers unauthenticated packets. Shadowsocks servers are timed with TCP connects.
+- 5 samples, 50 ms apart, median reported: one slow sample on a noisy cell link shouldn't paint a
+  good server red.
+- While the tunnel is up, probe sockets go through the socket protector, so they measure the real
+  path instead of being routed into the tunnel.

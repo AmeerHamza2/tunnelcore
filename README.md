@@ -41,9 +41,10 @@ The backend that issues its config lives in
 | `transport/shadowsocks` | AEAD Shadowsocks over TCP and UDP, credential probe, first-packet coalescing |
 | `transport/obfs` | SNI-aware TLS fragmentation, prefix disguise |
 | `transport/protect` | Fail-closed Android `VpnService.protect(fd)` |
+| `probe` | Device-side latency and loss to each server (UDP echo for WireGuard, TCP connect for Shadowsocks), for the server picker |
 | `engine` | Lifecycle, reconnect and backoff, failover, dead-session detection |
-| `mobile` | The gomobile API: `NewTunnel`, `Start(fd)`, `Stop`, `NetworkChanged`, `StatsJSON` |
-| `cmd/tun-harness` | Live demo, keygen, config validation, Linux runner |
+| `mobile` | The gomobile API: `NewTunnel`, `Start(fd)`, `Stop`, `NetworkChanged`, `StatsJSON`, `ProbeServersJSON` |
+| `cmd/tun-harness` | Live demo, keygen, config validation, latency probe, Linux runner |
 
 ## Key design decisions
 
@@ -57,6 +58,7 @@ The backend that issues its config lives in
 
 ```bash
 go run ./cmd/tun-harness demo     # ~1 s live demo, no root needed
+go run ./cmd/tun-harness probe -config cfg.json   # your latency to each server
 make test                         # vet + race tests
 make soak                         # leak and soak suites
 make android  /  make ios         # gomobile builds
