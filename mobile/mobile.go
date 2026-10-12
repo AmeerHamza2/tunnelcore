@@ -32,6 +32,7 @@ import (
 	"fmt"
 	"io"
 	"math"
+	"net/netip"
 	"runtime"
 	"strconv"
 	"strings"
@@ -42,6 +43,7 @@ import (
 	"github.com/ameerhamza2/tunnelcore/dnsproxy"
 	"github.com/ameerhamza2/tunnelcore/engine"
 	"github.com/ameerhamza2/tunnelcore/metrics"
+	"github.com/ameerhamza2/tunnelcore/probe"
 	"github.com/ameerhamza2/tunnelcore/transport"
 	"github.com/ameerhamza2/tunnelcore/transport/protect"
 	"github.com/ameerhamza2/tunnelcore/transport/shadowsocks"
@@ -417,6 +419,124 @@ type transportStatsJSON struct {
 	P50MS       int64   `json:"p50_ms"`
 	P95MS       int64   `json:"p95_ms"`
 	P99MS       int64   `json:"p99_ms"`
+}
+
+// ProbeServersJSON measures latency and loss from this device to every
+// server in the current configuration, and returns the results as JSON,
+// best first:
+//
+//	{"results":[{"name":"fra-01","protocol":"wireguard","method":"udp_echo",
+//	  "reachable":true,"rtt_ms":41.2,"rtt_p95_ms":55.0,"loss":0,"error":""}]}
+//
+// This is what a server picker shows next to each location: the user's own
+// latency, from their own network, rather than the backend's view from
+// wherever its prober happens to run.
+//
+// WireGuard servers are probed over UDP on the node's echo health port
+// (endpoint port + 1, the fleet's convention), because WireGuard does not
+// answer unauthenticated packets. Shadowsocks servers are timed with TCP
+// connects. rtt values are -1 when unreachable.
+//
+// It blocks for roughly timeoutMS (default 1000) plus a few hundred
+// milliseconds, so call it off the main thread. It is safe while the tunnel is
+// up: probe sockets then go through the socket protector, so they measure the
+// real path instead of being routed into the tunnel.
+func (t *Tunnel) ProbeServersJSON(timeoutMS int) string {
+	t.mu.Lock()
+	raw, running := t.cfgJSON, t.eng != nil
+	t.mu.Unlock()
+
+	fail := func(err error) string {
+		b, _ := json.Marshal(probeOutJSON{Results: []probeResultJSON{}, Error: err.Error()})
+		return string(b)
+	}
+	cfg, err := parseConfig(raw)
+	if err != nil {
+		return fail(err)
+	}
+	targets, protocols := probeTargets(cfg)
+	if len(targets) == 0 {
+		return fail(probe.ErrNoTargets)
+	}
+
+	pc := probe.Config{Timeout: msDuration(timeoutMS)}
+	if running {
+		// Only while the tunnel is up: before Start nothing is captured, and
+		// some platforms refuse to protect sockets for a VPN that is not
+		// established yet.
+		pc.Protect = t.protectFunc()
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	results, err := probe.Run(ctx, pc, targets)
+	if err != nil && len(results) == 0 {
+		return fail(err)
+	}
+
+	out := probeOutJSON{Results: make([]probeResultJSON, 0, len(results))}
+	for _, r := range results {
+		pr := probeResultJSON{
+			Name:      r.Name,
+			Protocol:  protocols[r.Name],
+			Method:    string(r.Method),
+			Reachable: r.Reachable,
+			RTTMS:     -1,
+			RTTP95MS:  -1,
+			Loss:      r.Loss,
+			Error:     r.Err,
+		}
+		if r.Reachable {
+			pr.RTTMS = float64(r.Median.Microseconds()) / 1000
+			pr.RTTP95MS = float64(r.P95.Microseconds()) / 1000
+		}
+		out.Results = append(out.Results, pr)
+	}
+	b, err := json.Marshal(out)
+	if err != nil {
+		return `{"results":[],"error":"marshal failed"}`
+	}
+	return string(b)
+}
+
+type probeOutJSON struct {
+	Results []probeResultJSON `json:"results"`
+	Error   string            `json:"error,omitempty"`
+}
+
+type probeResultJSON struct {
+	Name      string  `json:"name"`
+	Protocol  string  `json:"protocol"`
+	Method    string  `json:"method"`
+	Reachable bool    `json:"reachable"`
+	RTTMS     float64 `json:"rtt_ms"`
+	RTTP95MS  float64 `json:"rtt_p95_ms"`
+	Loss      float64 `json:"loss"`
+	Error     string  `json:"error,omitempty"`
+}
+
+// probeTargets maps configured servers to probe targets. Servers with an
+// unparseable endpoint are skipped: parseConfig already reports those, and the
+// picker should still show every server it can measure.
+func probeTargets(cfg *config) ([]probe.Target, map[string]string) {
+	targets := make([]probe.Target, 0, len(cfg.Servers))
+	protocols := make(map[string]string, len(cfg.Servers))
+	for _, s := range cfg.Servers {
+		ap, err := netip.ParseAddrPort(s.Endpoint)
+		if err != nil {
+			continue
+		}
+		t := probe.Target{Name: s.Name, Addr: ap, Method: probe.TCPConnect}
+		if s.Protocol == protoWireGuard {
+			if ap.Port() == 65535 {
+				continue
+			}
+			t.Addr = netip.AddrPortFrom(ap.Addr(), ap.Port()+1)
+			t.Method = probe.UDPEcho
+		}
+		targets = append(targets, t)
+		protocols[s.Name] = s.Protocol
+	}
+	return targets, protocols
 }
 
 // GeneratePrivateKey returns a new WireGuard private key, base64-encoded.
