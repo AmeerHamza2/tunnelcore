@@ -1,0 +1,270 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Slipstream VPN</title>
+<link rel="icon" href="data:,">
+<style>
+:root{
+  --bg:#0b1020; --panel:#121a30; --panel2:#18223d; --line:#24304f; --text:#e8ecf6; --muted:#8b97b5;
+  --accent:#5b8cff; --good:#2fd08a; --warn:#ffb547; --bad:#ff5d6c; --ss:#b48cff;
+}
+*{box-sizing:border-box}
+body{margin:0;background:radial-gradient(1200px 600px at 10% -10%,#1b2a5a 0,transparent 60%),var(--bg);color:var(--text);
+  font:14px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,sans-serif;min-height:100vh}
+header{display:flex;align-items:center;justify-content:space-between;padding:18px 28px;border-bottom:1px solid var(--line)}
+.brand{display:flex;align-items:center;gap:10px;font-weight:700;font-size:18px;letter-spacing:.2px}
+.logo{width:28px;height:28px;border-radius:8px;background:linear-gradient(135deg,#5b8cff,#2fd08a);display:grid;place-items:center;font-size:15px}
+.pill{padding:5px 12px;border-radius:999px;font-weight:600;font-size:12px;background:var(--panel2);border:1px solid var(--line)}
+.pill.connected{color:var(--good);border-color:#1f6b4a;background:#0f2a22}
+.pill.connecting,.pill.reconnecting{color:var(--warn);border-color:#6b5320;background:#2a2210}
+main{display:grid;grid-template-columns:360px 1fr;gap:20px;padding:22px 28px;max-width:1280px;margin:0 auto}
+@media(max-width:900px){main{grid-template-columns:1fr;padding:16px}}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:18px}
+.card h3{margin:0 0 12px;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.connect{display:flex;flex-direction:column;align-items:center;gap:14px;padding:26px 18px}
+.power{width:170px;height:170px;border-radius:50%;border:0;cursor:pointer;position:relative;color:#fff;font-size:15px;font-weight:700;
+  background:radial-gradient(circle at 50% 40%,#2a3a66,#141d38);box-shadow:0 0 0 10px #16203b,0 10px 40px #0008;transition:.3s}
+.power .ico{font-size:44px;display:block;margin-bottom:6px}
+.power.connected{background:radial-gradient(circle at 50% 40%,#2fd08a,#13744b);box-shadow:0 0 0 10px #12392b,0 0 60px #2fd08a55}
+.power.connecting,.power.reconnecting{background:radial-gradient(circle at 50% 40%,#ffb547,#8a5a12);animation:pulse 1.2s infinite}
+@keyframes pulse{50%{box-shadow:0 0 0 18px #2a2210,0 0 40px #ffb54755}}
+.state{font-size:20px;font-weight:700;text-transform:capitalize}
+.sub{color:var(--muted);text-align:center}
+.badge{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:8px;font-weight:600;font-size:12px}
+.badge.wg{background:#14244a;color:#8fb1ff;border:1px solid #2a4180}
+.badge.ss{background:#26183f;color:var(--ss);border:1px solid #4b2f7a}
+.locs{display:flex;flex-direction:column;gap:8px}
+.loc{display:flex;align-items:center;gap:12px;padding:12px;border-radius:12px;background:var(--panel2);border:1px solid var(--line);cursor:pointer;transition:.15s}
+.loc:hover{border-color:#3a4d80}
+.loc.sel{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent) inset}
+.flag{font-size:26px}
+.loc .n{font-weight:600}.loc .ip{color:var(--muted);font-size:12px}
+.lat{margin-left:auto;font-variant-numeric:tabular-nums;font-weight:600}
+.lat.g{color:var(--good)}.lat.m{color:var(--warn)}.lat.b{color:var(--bad)}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media(max-width:700px){.grid2{grid-template-columns:1fr}}
+.ipbox{padding:14px;border-radius:12px;background:var(--panel2);border:1px solid var(--line)}
+.ipbox .lbl{font-size:12px;color:var(--muted);margin-bottom:6px}
+.ipbox .addr{font-size:22px;font-weight:700;font-variant-numeric:tabular-nums;letter-spacing:.3px}
+.ipbox .where{margin-top:4px;font-size:15px}
+.ipbox .isp{color:var(--muted);font-size:12px;margin-top:2px}
+.ipbox.now.vpn{border-color:#1f6b4a;background:#0f2420}
+.arrow{display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:13px;margin:10px 0 0}
+.tiles{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+@media(max-width:700px){.tiles{grid-template-columns:repeat(2,1fr)}}
+.tile{background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:12px}
+.tile .k{font-size:12px;color:var(--muted)}.tile .v{font-size:20px;font-weight:700;margin-top:2px;font-variant-numeric:tabular-nums}
+.tile .v small{font-size:12px;color:var(--muted);font-weight:500}
+.row{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+button.btn{background:var(--panel2);color:var(--text);border:1px solid var(--line);padding:9px 14px;border-radius:10px;font-weight:600;cursor:pointer}
+button.btn:hover{border-color:#3a4d80}
+button.btn:disabled{opacity:.5;cursor:default}
+.switch{position:relative;width:52px;height:30px;flex:none}
+.switch input{display:none}
+.switch span{position:absolute;inset:0;background:#2a3557;border-radius:999px;transition:.2s;cursor:pointer}
+.switch span:after{content:"";position:absolute;width:24px;height:24px;left:3px;top:3px;border-radius:50%;background:#fff;transition:.2s}
+.switch input:checked+span{background:var(--bad)}
+.switch input:checked+span:after{transform:translateX(22px)}
+.censor{border-color:#4a2a33}
+.censor.on{background:#1c1016;border-color:var(--bad)}
+.log{font:12px/1.55 ui-monospace,SFMono-Regular,Menlo,monospace;max-height:250px;overflow:auto;background:#0a0f1e;border-radius:10px;padding:10px;border:1px solid var(--line)}
+.log div{white-space:pre-wrap}
+.log .t{color:#5d6a8c}.log .ev-state{color:#8fb1ff}.log .ev-warn{color:var(--warn)}.log .ev-error{color:var(--bad)}.log .ev-info{color:#c9d2e8}
+.right{display:flex;flex-direction:column;gap:20px}
+.muted{color:var(--muted)}
+.err{color:var(--bad);font-size:13px;min-height:18px;text-align:center}
+.bars{display:flex;align-items:flex-end;gap:2px;height:46px;margin-top:8px}
+.bars i{flex:1;opacity:.9;background:linear-gradient(#5b8cff,#2a4180);border-radius:2px 2px 0 0;min-height:2px}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand"><div class="logo">⚡</div>Slipstream VPN <span class="muted" style="font-weight:500;font-size:13px">· TunnelCore engine</span></div>
+  <div id="pill" class="pill">Disconnected</div>
+</header>
+<main>
+  <div style="display:flex;flex-direction:column;gap:20px">
+    <section class="card connect">
+      <button id="power" class="power"><span class="ico">⏻</span><span id="powerLbl">Connect</span></button>
+      <div id="state" class="state">disconnected</div>
+      <div id="via" class="sub">Pick a location and press connect</div>
+      <div id="err" class="err"></div>
+    </section>
+    <section class="card">
+      <h3>Locations <span id="probeNote" class="muted" style="text-transform:none;letter-spacing:0">· measuring latency…</span></h3>
+      <div id="locs" class="locs"></div>
+    </section>
+  </div>
+
+  <div class="right">
+    <section class="card">
+      <h3>Your IP address</h3>
+      <div class="grid2">
+        <div class="ipbox"><div class="lbl">Without VPN</div><div id="ipBefore">—</div></div>
+        <div id="ipNowBox" class="ipbox now"><div class="lbl" id="ipNowLbl">Right now</div><div id="ipNow">—</div></div>
+      </div>
+      <div class="row" style="margin-top:12px">
+        <button class="btn" id="checkIp">Check my IP again</button>
+        <span class="muted" id="ipNote"></span>
+      </div>
+    </section>
+
+    <section class="card">
+      <h3>Live connection</h3>
+      <div class="tiles">
+        <div class="tile"><div class="k">Download</div><div class="v" id="down">0 <small>Mbit/s</small></div></div>
+        <div class="tile"><div class="k">Upload</div><div class="v" id="up">0 <small>Mbit/s</small></div></div>
+        <div class="tile"><div class="k">Session</div><div class="v" id="since">—</div></div>
+        <div class="tile"><div class="k">Data used</div><div class="v" id="data">—</div></div>
+        <div class="tile"><div class="k">Transport</div><div class="v" id="tp" style="font-size:16px">—</div></div>
+        <div class="tile"><div class="k">Reconnects · DNS queries</div><div class="v" id="rc">—</div></div>
+      </div>
+      <div class="bars" id="bars"></div>
+      <div class="row" style="margin-top:12px">
+        <button class="btn" id="speed">Run 10 MB speed test</button>
+        <span id="speedRes" class="muted"></span>
+      </div>
+    </section>
+
+    <section class="card censor" id="censorCard">
+      <h3>Censorship test</h3>
+      <div class="row">
+        <label class="switch"><input type="checkbox" id="block"><span></span></label>
+        <div style="flex:1;min-width:220px"><b>Block WireGuard</b><div class="muted">Adds a firewall rule that drops every WireGuard packet, like a network that blocks VPNs. Watch the engine switch to Shadowsocks without you doing anything.</div></div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h3>Engine log</h3>
+      <div class="log" id="log"></div>
+    </section>
+  </div>
+</main>
+<script>
+const $ = id => document.getElementById(id);
+let locs = [], selected = null, last = null, prevBytes = null, history = [], lastState = "", lastTransport = "", probes = {};
+
+const flag = cc => cc && cc.length === 2 ? String.fromCodePoint(...[...cc.toUpperCase()].map(c => 0x1F1A5 + c.charCodeAt(0))) : "🌐";
+const fmtBytes = n => n < 1024 ? n + " B" : n < 1048576 ? (n/1024).toFixed(1) + " KB" : n < 1073741824 ? (n/1048576).toFixed(1) + " MB" : (n/1073741824).toFixed(2) + " GB";
+const fmtDur = s => { const h = Math.floor(s/3600), m = Math.floor(s%3600/60), x = s%60; return (h ? h + ":" + String(m).padStart(2,"0") : m) + ":" + String(x).padStart(2,"0"); };
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const tpBadge = t => !t ? "—" : t.includes("shadowsocks") ? `<span class="badge ss">🛡 Shadowsocks</span>` : `<span class="badge wg">⚡ WireGuard</span>`;
+
+async function api(path, body) {
+  const r = await fetch(path, body === undefined ? {} : {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(body)});
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.error || r.statusText);
+  return j;
+}
+
+function ipHTML(i) {
+  if (!i) return `<div class="addr muted">—</div>`;
+  if (i.error) return `<div class="addr" style="font-size:15px;color:var(--bad)">couldn't check</div><div class="isp">The IP lookup service didn't answer. Try again.</div>`;
+  return `<div class="addr">${esc(i.ip)}</div><div class="where">${flag(i.country_code)} ${esc([i.city, i.country].filter(Boolean).join(", "))}</div><div class="isp">${esc(i.isp)} · checked ${esc(i.checked_at)}</div>`;
+}
+
+function renderLocs() {
+  $("locs").innerHTML = locs.map(l => {
+    const p = probes[l.id], best = p && p.results && p.results.find(r => r.reachable);
+    let lat = `<span class="lat muted">…</span>`;
+    if (p) lat = best ? `<span class="lat ${best.rtt_ms < 120 ? "g" : best.rtt_ms < 250 ? "m" : "b"}">${best.rtt_ms < 10 ? best.rtt_ms.toFixed(1) : Math.round(best.rtt_ms)} ms</span>` : `<span class="lat b">unreachable</span>`;
+    return `<div class="loc ${selected === l.id ? "sel" : ""}" data-id="${esc(l.id)}"><span class="flag">${flag(l.country)}</span><div><div class="n">${esc(l.name)}</div><div class="ip">${esc(l.public_ip)}</div></div>${lat}</div>`;
+  }).join("");
+  document.querySelectorAll(".loc").forEach(el => el.onclick = () => { selected = el.dataset.id; renderLocs(); });
+}
+
+async function loadProbes() {
+  try { probes = await api("/api/probe"); $("probeNote").textContent = "· latency measured from this device"; } catch { $("probeNote").textContent = ""; }
+  renderLocs();
+}
+
+async function checkIp() {
+  $("ipNote").textContent = "checking…";
+  try {
+    const i = await api("/api/ip");
+    $("ipNow").innerHTML = ipHTML(i);
+    const vpn = last && last.state === "connected";
+    $("ipNowBox").classList.toggle("vpn", vpn && !i.error);
+    $("ipNowLbl").textContent = vpn ? "With Slipstream VPN" : "Right now";
+    $("ipNote").textContent = vpn ? "This is what websites see now." : "";
+  } catch (e) { $("ipNote").textContent = e.message; }
+}
+
+function render(s) {
+  const st = s.state || "disconnected";
+  $("pill").textContent = st[0].toUpperCase() + st.slice(1);
+  $("pill").className = "pill " + st;
+  $("power").className = "power " + st;
+  $("state").textContent = st;
+  const on = st !== "disconnected" && st !== "idle";
+  $("powerLbl").textContent = on ? "Disconnect" : "Connect";
+  if (s.location) {
+    $("via").innerHTML = st === "connected" ? `${flag(s.location.country)} ${esc(s.location.name)} · ${tpBadge(s.transport)}` : `${flag(s.location.country)} ${esc(s.location.name)}`;
+    if (!selected) { selected = s.location.id; renderLocs(); }
+  } else $("via").textContent = "Pick a location and press connect";
+  $("ipBefore").innerHTML = ipHTML(s.original_ip);
+  $("block").checked = !!s.wg_blocked;
+  $("censorCard").classList.toggle("on", !!s.wg_blocked);
+
+  const e = s.engine || {};
+  $("since").textContent = st === "connected" ? fmtDur(s.connected_seconds || 0) : "—";
+  $("data").innerHTML = e.bytes_down !== undefined ? `${fmtBytes(e.bytes_down)} <small>↓</small> ${fmtBytes(e.bytes_up)} <small>↑</small>` : "—";
+  $("tp").innerHTML = st === "connected" ? tpBadge(s.transport) : "—";
+  $("rc").textContent = e.reconnects !== undefined ? `${e.reconnects} · ${e.dns_queries}` : "—";
+
+  const now = s.server_time_ms;
+  if (prevBytes && e.bytes_down !== undefined && now > prevBytes.t) {
+    const dt = (now - prevBytes.t) / 1000;
+    const d = Math.max(0, e.bytes_down - prevBytes.d) * 8 / dt / 1e6, u = Math.max(0, e.bytes_up - prevBytes.u) * 8 / dt / 1e6;
+    $("down").innerHTML = `${d.toFixed(d < 10 ? 2 : 1)} <small>Mbit/s</small>`;
+    $("up").innerHTML = `${u.toFixed(u < 10 ? 2 : 1)} <small>Mbit/s</small>`;
+    history.push(d); if (history.length > 60) history.shift();
+  } else if (e.bytes_down === undefined) { $("down").innerHTML = `0 <small>Mbit/s</small>`; $("up").innerHTML = `0 <small>Mbit/s</small>`; }
+  prevBytes = e.bytes_down !== undefined ? {t: now, d: e.bytes_down, u: e.bytes_up} : null;
+  const mx = Math.max(1, ...history);
+  $("bars").innerHTML = Array(60 - history.length).fill(0).concat(history).map(v => `<i style="height:${Math.max(2, v / mx * 46)}px"></i>`).join("");
+
+  const log = $("log"), atBottom = log.scrollTop + log.clientHeight >= log.scrollHeight - 10;
+  log.innerHTML = (s.events || []).map(ev => `<div class="ev-${ev.kind}"><span class="t">${new Date(ev.at).toLocaleTimeString()}</span> ${esc(ev.text)}</div>`).join("");
+  if (atBottom) log.scrollTop = log.scrollHeight;
+
+  if ((st === "connected" && (lastState !== "connected" || s.transport !== lastTransport)) || (st === "disconnected" && lastState && lastState !== "disconnected")) setTimeout(checkIp, 600);
+  lastState = st; lastTransport = s.transport;
+  last = s;
+}
+
+async function poll() {
+  try { render(await api("/api/status")); $("err").textContent = last && last.error && last.state !== "connected" ? last.error : ""; }
+  catch { $("pill").textContent = "Panel offline"; }
+  setTimeout(poll, 1000);
+}
+
+$("power").onclick = async () => {
+  $("err").textContent = "";
+  try {
+    if (last && last.state !== "disconnected" && last.state !== "idle") { await api("/api/disconnect", {}); }
+    else {
+      if (!selected) { $("err").textContent = "Pick a location first"; return; }
+      $("state").textContent = "connecting"; $("power").className = "power connecting";
+      await api("/api/connect", {id: selected});
+    }
+  } catch (e) { $("err").textContent = e.message; }
+};
+$("block").onchange = async ev => { try { await api("/api/block-wireguard", {on: ev.target.checked}); } catch (e) { $("err").textContent = e.message; ev.target.checked = !ev.target.checked; } };
+$("checkIp").onclick = checkIp;
+$("speed").onclick = async () => {
+  $("speed").disabled = true; $("speedRes").textContent = "downloading…";
+  try { const r = await api("/api/speedtest", {}); $("speedRes").textContent = `${r.mbps.toFixed(1)} Mbit/s · first byte ${r.ttfb_ms} ms`; }
+  catch (e) { $("speedRes").textContent = e.message; }
+  $("speed").disabled = false;
+};
+
+(async () => {
+  try { locs = await api("/api/locations"); if (locs.length === 1) selected = locs[0].id; } catch {}
+  renderLocs(); poll(); checkIp(); loadProbes(); setInterval(loadProbes, 30000);
+})();
+</script>
+</body>
+</html>

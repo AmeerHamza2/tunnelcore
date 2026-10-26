@@ -45,6 +45,8 @@ The backend that issues its config lives in
 | `engine` | Lifecycle, reconnect and backoff, failover, dead-session detection |
 | `mobile` | The gomobile API: `NewTunnel`, `Start(fd)`, `Stop`, `NetworkChanged`, `StatsJSON`, `ProbeServersJSON` |
 | `cmd/tun-harness` | Live demo, keygen, config validation, latency probe, Linux runner |
+| `cmd/slipstream-desktop` | The engine as a real Linux VPN client with a web control panel |
+| `deploy/server-setup.sh` | Turns an Ubuntu VPS into an exit server (WireGuard, Shadowsocks, health port) |
 
 ## Key design decisions
 
@@ -68,8 +70,13 @@ The demo races four servers (one blocked, one dead), sends real traffic,
 simulates a Wi-Fi to cellular handover, fails over from WireGuard to
 Shadowsocks, and prints per-server metrics.
 
+To run it as a real VPN against your own server, with a web panel showing the
+IP change and a "block WireGuard" switch, see
+[docs/DESKTOP_DEMO.md](docs/DESKTOP_DEMO.md).
+
 ## Docs
 
+- [docs/DESKTOP_DEMO.md](docs/DESKTOP_DEMO.md): real VPN on Linux with a web panel, and the exit-server script
 - [docs/INTEGRATION.md](docs/INTEGRATION.md): the JSON config contract, plus Kotlin and Swift integration
 - [docs/DESIGN.md](docs/DESIGN.md): architecture and design decisions in depth
 - [docs/ROBUSTNESS.md](docs/ROBUSTNESS.md): soak, fuzz and benchmark results
