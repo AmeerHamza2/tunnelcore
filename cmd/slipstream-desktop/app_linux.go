@@ -95,9 +95,22 @@ func runServe(args []string) error {
 
 	srv := &http.Server{Addr: fs.listen, Handler: a.routes(), ReadHeaderTimeout: 5 * time.Second}
 	go a.shutdownOnSignal(srv)
-	fmt.Fprintf(os.Stderr, "control panel on http://%s (open it from your computer's browser)\n", fs.listen)
-	for _, addr := range localAddrs() {
+	addrs := localAddrs()
+	fmt.Fprintf(os.Stderr, "\ncontrol panel (open it in your computer's browser):\n")
+	for _, addr := range addrs {
 		fmt.Fprintf(os.Stderr, "  http://%s%s\n", addr, portOf(fs.listen))
+	}
+	if fs.proxy != "" {
+		ln, err := net.Listen("tcp", fs.proxy)
+		if err != nil {
+			return fmt.Errorf("browser proxy: %w", err)
+		}
+		psrv := &http.Server{Handler: &browserProxy{app: a}, ReadHeaderTimeout: 10 * time.Second}
+		go func() { _ = psrv.Serve(ln) }()
+		if len(addrs) > 0 {
+			fmt.Fprintf(os.Stderr, "\nbrowser proxy on %s%s. To use the VPN in a separate Chrome window on a Mac:\n", addrs[0], portOf(fs.proxy))
+			fmt.Fprintf(os.Stderr, "  open -na \"Google Chrome\" --args --proxy-server=\"http://%s%s\" --user-data-dir=/tmp/slipstream-chrome\n\n", addrs[0], portOf(fs.proxy))
+		}
 	}
 	if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		return err

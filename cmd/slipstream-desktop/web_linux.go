@@ -18,8 +18,8 @@ import (
 var panelHTML []byte
 
 type serveFlags struct {
-	fs                     *flag.FlagSet
-	locations, key, listen string
+	fs                            *flag.FlagSet
+	locations, key, listen, proxy string
 }
 
 func newServeFlags() *serveFlags {
@@ -27,6 +27,7 @@ func newServeFlags() *serveFlags {
 	s.fs.StringVar(&s.locations, "locations", "", "folder with location .json files from server-setup.sh")
 	s.fs.StringVar(&s.key, "key", defaultKeyPath(), "device private key file (created if missing)")
 	s.fs.StringVar(&s.listen, "listen", "0.0.0.0:8080", "address for the control panel")
+	s.fs.StringVar(&s.proxy, "proxy", "0.0.0.0:8888", "browser proxy address, so a browser on your computer uses this VPN (empty disables)")
 	return s
 }
 

@@ -52,6 +52,7 @@ main{display:grid;grid-template-columns:360px 1fr;gap:20px;padding:22px 28px;max
 .ipbox .isp{color:var(--muted);font-size:12px;margin-top:2px}
 .ipbox.now.vpn{border-color:#1f6b4a;background:#0f2420}
 .match{margin-top:8px;font-size:13px;color:var(--good);font-weight:600}
+.cmd{background:#0a0f1e;border:1px solid var(--line);border-radius:10px;padding:10px;font:12px/1.5 ui-monospace,Menlo,monospace;white-space:pre-wrap;word-break:break-all;margin:10px 0}
 .arrow{display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:13px;margin:10px 0 0}
 .tiles{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
 @media(max-width:700px){.tiles{grid-template-columns:repeat(2,1fr)}}
@@ -127,6 +128,13 @@ button.btn:disabled{opacity:.5;cursor:default}
         <button class="btn" id="speed">Run 10 MB speed test</button>
         <span id="speedRes" class="muted"></span>
       </div>
+    </section>
+
+    <section class="card">
+      <h3>Use the VPN in your Mac's browser</h3>
+      <div class="muted">The VPN runs inside the Linux VM. To send a browser on your Mac through it, open a separate Chrome window with this command in Terminal, then visit any "what is my IP" site in that window:</div>
+      <pre class="cmd" id="chromeCmd"></pre>
+      <div class="row"><button class="btn" id="copyCmd">Copy command</button><span class="muted" id="copied"></span></div>
     </section>
 
     <section class="card censor" id="censorCard">
@@ -265,6 +273,10 @@ $("speed").onclick = async () => {
   catch (e) { $("speedRes").textContent = e.message; }
   $("speed").disabled = false;
 };
+
+const chromeCmd = `open -na "Google Chrome" --args --proxy-server="http://${location.hostname}:8888" --user-data-dir=/tmp/slipstream-chrome`;
+$("chromeCmd").textContent = chromeCmd;
+$("copyCmd").onclick = async () => { try { await navigator.clipboard.writeText(chromeCmd); $("copied").textContent = "copied"; } catch { $("copied").textContent = "select the text above and copy it"; } };
 
 (async () => {
   try { locs = await api("/api/locations"); if (locs.length === 1) selected = locs[0].id; } catch {}

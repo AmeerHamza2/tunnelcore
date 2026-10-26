@@ -40,6 +40,14 @@ sudo ./slipstream-desktop serve -locations locations
 
 Open the printed `http://<machine-ip>:8080` from any browser on the same network.
 
+The VPN covers the Linux machine. To put a browser on another computer (for
+example the Mac hosting the VM) through it, use the built-in browser proxy on
+port 8888, which only accepts private-network clients:
+
+```bash
+open -na "Google Chrome" --args --proxy-server="http://<machine-ip>:8888" --user-data-dir=/tmp/slipstream-chrome
+```
+
 ## How it works
 
 - **Routing.** The client creates `slip0`, routes `0.0.0.0/1` and `128.0.0.0/1`
