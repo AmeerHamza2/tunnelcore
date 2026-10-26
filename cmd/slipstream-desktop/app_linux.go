@@ -488,9 +488,15 @@ func (a *app) probeAll() map[string]json.RawMessage {
 	return out
 }
 
-// lookupIP asks a public service which IP and location the internet sees.
+// lookupIP asks public services which IP and location the internet sees.
 // It is an ordinary request from this machine, so while connected it goes
 // through the tunnel and reports the exit server's address.
+//
+// Several services are asked in parallel and the first in priority order that
+// answers wins. Order matters: geolocation databases disagree for cloud
+// ranges (one popular free service places every Oracle Cloud address at
+// Oracle's head office in Austin), and some are unreachable from some
+// networks, so one service alone is not good enough for a demo.
 func lookupIP(timeout time.Duration) ipInfo {
 	client := &http.Client{
 		Timeout: timeout,
@@ -502,37 +508,120 @@ func lookupIP(timeout time.Duration) ipInfo {
 			DisableKeepAlives: true,
 		},
 	}
-	now := time.Now().Format("15:04:05")
-	resp, err := client.Get("http://ip-api.com/json/?fields=status,message,country,countryCode,regionName,city,isp,lat,lon,query")
-	if err == nil {
-		defer resp.Body.Close()
-		var r struct {
-			Status, Message, Country, CountryCode, RegionName, City, ISP, Query string
-			Lat, Lon                                                            float64
-		}
-		b, _ := io.ReadAll(io.LimitReader(resp.Body, 1<<16))
-		if json.Unmarshal(b, &r) == nil && r.Status == "success" {
-			return ipInfo{IP: r.Query, City: r.City, Region: r.RegionName, Country: r.Country,
-				CountryCode: r.CountryCode, ISP: r.ISP, Lat: r.Lat, Lon: r.Lon, CheckedAt: now}
-		}
-	}
-	// Fallback service.
-	resp2, err2 := client.Get("https://ipinfo.io/json")
-	if err2 != nil {
-		msg := "lookup failed"
+	get := func(url string, v any) error {
+		req, _ := http.NewRequest("GET", url, nil)
+		req.Header.Set("User-Agent", "slipstream-desktop")
+		req.Header.Set("Accept", "application/json")
+		resp, err := client.Do(req)
 		if err != nil {
-			msg = err.Error()
+			return err
 		}
-		return ipInfo{Error: msg, CheckedAt: now}
+		defer resp.Body.Close()
+		if resp.StatusCode != 200 {
+			return fmt.Errorf("%s: HTTP %d", url, resp.StatusCode)
+		}
+		b, err := io.ReadAll(io.LimitReader(resp.Body, 1<<16))
+		if err != nil {
+			return err
+		}
+		return json.Unmarshal(b, v)
 	}
-	defer resp2.Body.Close()
-	var r2 struct{ IP, City, Region, Country, Org string }
-	b, _ := io.ReadAll(io.LimitReader(resp2.Body, 1<<16))
-	if json.Unmarshal(b, &r2) != nil || r2.IP == "" {
-		return ipInfo{Error: "unexpected response", CheckedAt: now}
+	now := time.Now().Format("15:04:05")
+
+	sources := []func() (ipInfo, error){
+		func() (ipInfo, error) { // ipinfo.io
+			var r struct{ IP, City, Region, Country, Org string }
+			if err := get("https://ipinfo.io/json", &r); err != nil || r.IP == "" {
+				return ipInfo{}, fmt.Errorf("ipinfo: %v", err)
+			}
+			return ipInfo{IP: r.IP, City: r.City, Region: r.Region, CountryCode: r.Country,
+				ISP: stripASN(r.Org)}, nil
+		},
+		func() (ipInfo, error) { // ipapi.co
+			var r struct {
+				IP          string  `json:"ip"`
+				City        string  `json:"city"`
+				Region      string  `json:"region"`
+				Country     string  `json:"country_name"`
+				CountryCode string  `json:"country_code"`
+				Org         string  `json:"org"`
+				Lat         float64 `json:"latitude"`
+				Lon         float64 `json:"longitude"`
+			}
+			if err := get("https://ipapi.co/json/", &r); err != nil || r.IP == "" {
+				return ipInfo{}, fmt.Errorf("ipapi.co: %v", err)
+			}
+			return ipInfo{IP: r.IP, City: r.City, Region: r.Region, Country: r.Country,
+				CountryCode: r.CountryCode, ISP: r.Org, Lat: r.Lat, Lon: r.Lon}, nil
+		},
+		func() (ipInfo, error) { // Cloudflare: IP and country only, but very reachable
+			req, _ := http.NewRequest("GET", "https://www.cloudflare.com/cdn-cgi/trace", nil)
+			resp, err := client.Do(req)
+			if err != nil {
+				return ipInfo{}, err
+			}
+			defer resp.Body.Close()
+			b, _ := io.ReadAll(io.LimitReader(resp.Body, 1<<14))
+			var info ipInfo
+			for _, line := range strings.Split(string(b), "\n") {
+				k, v, _ := strings.Cut(line, "=")
+				switch k {
+				case "ip":
+					info.IP = v
+				case "loc":
+					info.CountryCode = v
+				}
+			}
+			if info.IP == "" {
+				return ipInfo{}, errors.New("cloudflare: no ip")
+			}
+			return info, nil
+		},
+		func() (ipInfo, error) { // ip-api.com: last, its data for cloud ranges is poor
+			var r struct {
+				Status, Country, CountryCode, RegionName, City, ISP, Query string
+				Lat, Lon                                                   float64
+			}
+			if err := get("http://ip-api.com/json/?fields=status,country,countryCode,regionName,city,isp,lat,lon,query", &r); err != nil || r.Status != "success" {
+				return ipInfo{}, fmt.Errorf("ip-api: %v", err)
+			}
+			return ipInfo{IP: r.Query, City: r.City, Region: r.RegionName, Country: r.Country,
+				CountryCode: r.CountryCode, ISP: r.ISP, Lat: r.Lat, Lon: r.Lon}, nil
+		},
 	}
-	return ipInfo{IP: r2.IP, City: r2.City, Region: r2.Region, Country: r2.Country,
-		CountryCode: r2.Country, ISP: r2.Org, CheckedAt: now}
+
+	type result struct {
+		info ipInfo
+		err  error
+	}
+	results := make([]chan result, len(sources))
+	for i, src := range sources {
+		results[i] = make(chan result, 1)
+		go func(c chan result, f func() (ipInfo, error)) {
+			info, err := f()
+			c <- result{info, err}
+		}(results[i], src)
+	}
+	var errs []string
+	for _, c := range results {
+		r := <-c
+		if r.err == nil {
+			r.info.CheckedAt = now
+			return r.info
+		}
+		errs = append(errs, r.err.Error())
+	}
+	return ipInfo{Error: strings.Join(errs, "; "), CheckedAt: now}
+}
+
+// stripASN turns "AS31898 Oracle Corporation" into "Oracle Corporation".
+func stripASN(org string) string {
+	if strings.HasPrefix(org, "AS") {
+		if _, rest, ok := strings.Cut(org, " "); ok {
+			return rest
+		}
+	}
+	return org
 }
 
 // speedTest downloads a fixed amount through whatever route is current.

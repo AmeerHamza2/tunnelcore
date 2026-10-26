@@ -51,6 +51,7 @@ main{display:grid;grid-template-columns:360px 1fr;gap:20px;padding:22px 28px;max
 .ipbox .where{margin-top:4px;font-size:15px}
 .ipbox .isp{color:var(--muted);font-size:12px;margin-top:2px}
 .ipbox.now.vpn{border-color:#1f6b4a;background:#0f2420}
+.match{margin-top:8px;font-size:13px;color:var(--good);font-weight:600}
 .arrow{display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:13px;margin:10px 0 0}
 .tiles{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
 @media(max-width:700px){.tiles{grid-template-columns:repeat(2,1fr)}}
@@ -149,6 +150,7 @@ let locs = [], selected = null, last = null, prevBytes = null, history = [], las
 const flag = cc => cc && cc.length === 2 ? String.fromCodePoint(...[...cc.toUpperCase()].map(c => 0x1F1A5 + c.charCodeAt(0))) : "🌐";
 const fmtBytes = n => n < 1024 ? n + " B" : n < 1048576 ? (n/1024).toFixed(1) + " KB" : n < 1073741824 ? (n/1048576).toFixed(1) + " MB" : (n/1073741824).toFixed(2) + " GB";
 const fmtDur = s => { const h = Math.floor(s/3600), m = Math.floor(s%3600/60), x = s%60; return (h ? h + ":" + String(m).padStart(2,"0") : m) + ":" + String(x).padStart(2,"0"); };
+const countryName = cc => { try { return cc ? new Intl.DisplayNames(["en"], {type: "region"}).of(cc.toUpperCase()) : ""; } catch { return cc || ""; } };
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const tpBadge = t => !t ? "—" : t.includes("shadowsocks") ? `<span class="badge ss">🛡 Shadowsocks</span>` : `<span class="badge wg">⚡ WireGuard</span>`;
 
@@ -162,7 +164,7 @@ async function api(path, body) {
 function ipHTML(i) {
   if (!i) return `<div class="addr muted">—</div>`;
   if (i.error) return `<div class="addr" style="font-size:15px;color:var(--bad)">couldn't check</div><div class="isp">The IP lookup service didn't answer. Try again.</div>`;
-  return `<div class="addr">${esc(i.ip)}</div><div class="where">${flag(i.country_code)} ${esc([i.city, i.country].filter(Boolean).join(", "))}</div><div class="isp">${esc(i.isp)} · checked ${esc(i.checked_at)}</div>`;
+  return `<div class="addr">${esc(i.ip)}</div><div class="where">${flag(i.country_code)} ${esc([i.city, i.country || countryName(i.country_code)].filter(Boolean).join(", "))}</div><div class="isp">${esc(i.isp)} · checked ${esc(i.checked_at)}</div>`;
 }
 
 function renderLocs() {
@@ -184,8 +186,11 @@ async function checkIp() {
   $("ipNote").textContent = "checking…";
   try {
     const i = await api("/api/ip");
-    $("ipNow").innerHTML = ipHTML(i);
     const vpn = last && last.state === "connected";
+    let html = ipHTML(i);
+    if (vpn && !i.error && last.location && i.ip === last.location.public_ip)
+      html += `<div class="match">✓ Same IP as your ${flag(last.location.country)} ${esc(last.location.name)} server: traffic leaves from there</div>`;
+    $("ipNow").innerHTML = html;
     $("ipNowBox").classList.toggle("vpn", vpn && !i.error);
     $("ipNowLbl").textContent = vpn ? "With Slipstream VPN" : "Right now";
     $("ipNote").textContent = vpn ? "This is what websites see now." : "";
