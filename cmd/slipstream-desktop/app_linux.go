@@ -16,6 +16,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/ameerhamza2/tunnelcore/mobile"
@@ -69,6 +70,7 @@ type app struct {
 	probes    map[string]json.RawMessage
 	probedAt  time.Time
 	busy      bool
+	stopping  bool // a user-requested disconnect is in progress
 }
 
 func runServe(args []string) error {
@@ -229,10 +231,14 @@ func (a *app) OnStateChange(state, reason, transportName, errMsg string) {
 			a.connAt = time.Now()
 		}
 	}
-	if errMsg != "" {
+	if errMsg != "" && !a.stopping {
 		a.lastErr = errMsg
 	}
+	stopping := a.stopping
 	a.mu.Unlock()
+	if stopping && errMsg != "" {
+		errMsg = "" // a write racing a user-requested stop is not a failure
+	}
 
 	text := "engine: " + state
 	if transportName != "" {
@@ -325,19 +331,22 @@ func (a *app) connect(id string) error {
 	a.mu.Unlock()
 	if blocked {
 		if err := setWireGuardBlocked(loc.endpoints("wireguard"), true); err != nil {
-			restoreNetwork(st)
+			_ = syscall.Close(fd) // the engine never took ownership
+			deleteTun()
 			return err
 		}
 		a.logf("warn", "firewall drops all WireGuard packets to %s, like a censoring network", loc.PublicIP)
 	}
 	if err := t.Start(fd); err != nil {
 		restoreNetwork(st)
+		deleteTun()
 		_ = setWireGuardBlocked(nil, false)
 		return fmt.Errorf("starting engine: %w", err)
 	}
 	if err := routeIntoTunnel(st); err != nil {
-		_ = t.Stop()
 		restoreNetwork(st)
+		_ = t.Stop()
+		deleteTun()
 		return err
 	}
 	a.mu.Lock()
@@ -370,11 +379,16 @@ func (a *app) disconnectLocked() {
 		return
 	}
 	a.logf("info", "disconnecting from %s", loc.Name)
-	restoreNetwork(st) // routes first, so nothing is sent into a closing tunnel
+	a.mu.Lock()
+	a.stopping = true
+	a.mu.Unlock()
+	restoreNetwork(st) // routes first, so nothing new is sent into a closing tunnel
 	_ = t.Stop()
+	deleteTun() // only now: the engine no longer reads or writes it
 	_ = setWireGuardBlocked(nil, false)
 	a.mu.Lock()
 	a.state, a.transport, a.connAt, a.current = "disconnected", "", time.Time{}, nil
+	a.lastErr, a.stopping = "", false
 	a.mu.Unlock()
 	go a.refreshOriginal()
 }

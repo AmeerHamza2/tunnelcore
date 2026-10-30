@@ -184,7 +184,8 @@ func routeIntoTunnel(st *netState) error {
 	return nil
 }
 
-// restoreNetwork undoes routeIntoTunnel and removes the interface.
+// restoreNetwork undoes routeIntoTunnel. The interface itself is removed by
+// deleteTun, after the engine has stopped.
 func restoreNetwork(st *netState) {
 	if st == nil {
 		return
@@ -199,11 +200,15 @@ func restoreNetwork(st *netState) {
 	for _, ip := range st.serverIPs {
 		runQuiet("ip", "route", "del", ip.String()+"/32")
 	}
-	runQuiet("ip", "link", "del", tunName)
 	if st.oldIPv6 != "" {
 		_ = os.WriteFile(ipv6Sysctl, []byte(st.oldIPv6), 0o644)
 	}
 }
+
+// deleteTun removes the tunnel interface. It must run only after the engine
+// has stopped: deleting the interface under a running engine makes its next
+// write fail with EIO, which it then reports as a tunnel error.
+func deleteTun() { runQuiet("ip", "link", "del", tunName) }
 
 // cleanupLeftovers removes anything a previous crashed run left behind.
 func cleanupLeftovers() {
