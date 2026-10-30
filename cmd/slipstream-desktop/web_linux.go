@@ -12,6 +12,8 @@ import (
 	"os/signal"
 	"syscall"
 	"time"
+
+	"github.com/ameerhamza2/tunnelcore/mobile"
 )
 
 //go:embed panel.html
@@ -76,6 +78,7 @@ func (a *app) routes() http.Handler {
 			"error": s.Error, "wg_blocked": s.WGBlocked, "connected_seconds": s.Since,
 			"engine": s.Engine, "events": s.Events, "original_ip": s.Original,
 			"server_time_ms": s.ServerTime,
+			"engine_version": mobile.Version(),
 		})
 	})
 	mux.HandleFunc("GET /api/ip", func(w http.ResponseWriter, _ *http.Request) {

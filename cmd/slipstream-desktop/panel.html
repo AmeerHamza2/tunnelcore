@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Slipstream VPN</title>
+<title>Slipstream VPN · Mode Mobile demo</title>
 <link rel="icon" href="data:,">
 <style>
 :root{
@@ -75,6 +75,34 @@ button.btn:disabled{opacity:.5;cursor:default}
 .log div{white-space:pre-wrap}
 .log .t{color:#5d6a8c}.log .ev-state{color:#8fb1ff}.log .ev-warn{color:var(--warn)}.log .ev-error{color:var(--bad)}.log .ev-info{color:#c9d2e8}
 .right{display:flex;flex-direction:column;gap:20px}
+.who{font-size:12.5px;color:var(--muted);font-weight:500;margin-top:2px}
+.who b{color:#c9d2e8;font-weight:600}
+.hero{max-width:1280px;margin:18px auto 0;padding:0 28px}
+.hero .box{display:flex;gap:16px;align-items:center;flex-wrap:wrap;background:linear-gradient(90deg,#16224a,#121a30);border:1px solid #2a3a6a;border-radius:16px;padding:14px 18px}
+.live{display:inline-flex;align-items:center;gap:7px;padding:4px 10px;border-radius:999px;background:#2a1418;color:#ff8a95;border:1px solid #5a2630;font-weight:700;font-size:11px;letter-spacing:.08em;text-transform:uppercase}
+.live i{width:8px;height:8px;border-radius:50%;background:#ff5d6c;animation:blink 1.4s infinite}
+@keyframes blink{50%{opacity:.25}}
+.hero .txt{flex:1;min-width:260px;color:#c9d2e8}
+.steps{display:flex;flex-direction:column;gap:8px;counter-reset:st}
+.step{display:flex;gap:10px;align-items:flex-start;padding:9px 10px;border-radius:10px;background:var(--panel2);border:1px solid var(--line)}
+.step .dot{flex:none;width:22px;height:22px;border-radius:50%;display:grid;place-items:center;font-size:12px;font-weight:700;background:#24304f;color:var(--muted)}
+.step.done{border-color:#1f6b4a;background:#0f2420}
+.step.done .dot{background:var(--good);color:#06291a}
+.step.next{border-color:var(--accent)}
+.step .t1{font-weight:600}.step .t2{font-size:12px;color:var(--muted)}
+.facts{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+@media(max-width:1000px){.facts{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:600px){.facts{grid-template-columns:1fr}}
+.fact{background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:10px 12px}
+.fact .k{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.fact .v{margin-top:3px;font-size:13px}
+a.link{color:#8fb1ff;text-decoration:none;font-weight:600}
+a.link:hover{text-decoration:underline}
+.sites{display:flex;flex-direction:column;gap:8px}
+.site{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:10px;background:var(--panel2);border:1px solid var(--line)}
+.site .note{margin-left:auto;font-size:12px;color:var(--muted);text-align:right}
+details summary{cursor:pointer;color:var(--muted);font-size:13px;margin-top:10px}
+footer{max-width:1280px;margin:0 auto;padding:6px 28px 28px;color:var(--muted);font-size:12px;display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px}
 .muted{color:var(--muted)}
 .err{color:var(--bad);font-size:13px;min-height:18px;text-align:center}
 .bars{display:flex;align-items:flex-end;gap:2px;height:46px;margin-top:8px}
@@ -83,9 +111,14 @@ button.btn:disabled{opacity:.5;cursor:default}
 </head>
 <body>
 <header>
-  <div class="brand"><div class="logo">⚡</div>Slipstream VPN <span class="muted" style="font-weight:500;font-size:13px">· TunnelCore engine</span></div>
+  <div class="brand"><div class="logo">⚡</div><div>Slipstream VPN <span class="muted" style="font-weight:500;font-size:13px">· TunnelCore engine</span>
+    <div class="who">Built by <b>Ameer Hamza</b> · Live demo for <b>Mode Mobile</b> · Senior Backend Engineer (Go / VPN)</div></div></div>
   <div id="pill" class="pill">Disconnected</div>
 </header>
+<div class="hero"><div class="box">
+  <span class="live"><i></i>Live demo</span>
+  <div class="txt">My Go VPN engine, the same code that compiles to Android and iOS with gomobile, running as a <b>real VPN</b> through my own exit server in <b>Singapore</b>. Nothing here is simulated.</div>
+</div></div>
 <main>
   <div style="display:flex;flex-direction:column;gap:20px">
     <section class="card connect">
@@ -97,6 +130,10 @@ button.btn:disabled{opacity:.5;cursor:default}
     <section class="card">
       <h3>Locations <span id="probeNote" class="muted" style="text-transform:none;letter-spacing:0">· measuring latency…</span></h3>
       <div id="locs" class="locs"></div>
+    </section>
+    <section class="card">
+      <h3>Demo walkthrough <a href="#" class="link" id="resetSteps" style="float:right;text-transform:none;letter-spacing:0;font-size:12px">reset</a></h3>
+      <div class="steps" id="steps"></div>
     </section>
   </div>
 
@@ -131,10 +168,16 @@ button.btn:disabled{opacity:.5;cursor:default}
     </section>
 
     <section class="card">
-      <h3>Use the VPN in your Mac's browser</h3>
-      <div class="muted">The VPN runs inside the Linux VM. To send a browser on your Mac through it, open a separate Chrome window with this command in Terminal, then visit any "what is my IP" site in that window:</div>
-      <pre class="cmd" id="chromeCmd"></pre>
-      <div class="row"><button class="btn" id="copyCmd">Copy command</button><span class="muted" id="copied"></span></div>
+      <h3>Check it on a real website</h3>
+      <div class="sites">
+        <div class="site">🦈 <a class="link" href="https://surfshark.com/what-is-my-ip" target="_blank" rel="noopener">surfshark.com/what-is-my-ip</a><span class="note">shows Singapore correctly<br>("Not Protected" = not a Surfshark server)</span></div>
+        <div class="site">🔎 <a class="link" href="https://ipinfo.io" target="_blank" rel="noopener">ipinfo.io</a><span class="note">IP, network and country</span></div>
+        <div class="site">🌐 <a class="link" href="https://www.whatismyip.com" target="_blank" rel="noopener">whatismyip.com</a><span class="note">same IP, but its geo database<br>puts all Oracle IPs in Austin, US</span></div>
+      </div>
+      <details><summary>Browser setup (the VPN runs in a Linux VM; the browser reaches it through a proxy on :8888)</summary>
+        <pre class="cmd" id="chromeCmd"></pre>
+        <div class="row"><button class="btn" id="copyCmd">Copy command</button><span class="muted" id="copied"></span></div>
+      </details>
     </section>
 
     <section class="card censor" id="censorCard">
@@ -146,11 +189,20 @@ button.btn:disabled{opacity:.5;cursor:default}
     </section>
 
     <section class="card">
+      <h3>Under the hood</h3>
+      <div class="facts" id="facts"></div>
+    </section>
+
+    <section class="card">
       <h3>Engine log</h3>
       <div class="log" id="log"></div>
     </section>
   </div>
 </main>
+<footer>
+  <span>Slipstream VPN · designed and built by <b style="color:#c9d2e8">Ameer Hamza</b> for the Mode Mobile interview</span>
+  <span>github.com/AmeerHamza2/tunnelcore · github.com/AmeerHamza2/slipstream-control</span>
+</footer>
 <script>
 const $ = id => document.getElementById(id);
 let locs = [], selected = null, last = null, prevBytes = null, history = [], lastState = "", lastTransport = "", probes = {};
@@ -196,8 +248,8 @@ async function checkIp() {
     const i = await api("/api/ip");
     const vpn = last && last.state === "connected";
     let html = ipHTML(i);
-    if (vpn && !i.error && last.location && i.ip === last.location.public_ip)
-      html += `<div class="match">✓ Same IP as your ${flag(last.location.country)} ${esc(last.location.name)} server: traffic leaves from there</div>`;
+    lastExitMatch = !!(vpn && !i.error && last.location && i.ip === last.location.public_ip);
+    if (lastExitMatch) html += `<div class="match">✓ Same IP as your ${flag(last.location.country)} ${esc(last.location.name)} server: traffic leaves from there</div>`;
     $("ipNow").innerHTML = html;
     $("ipNowBox").classList.toggle("vpn", vpn && !i.error);
     $("ipNowLbl").textContent = vpn ? "With Slipstream VPN" : "Right now";
@@ -246,6 +298,8 @@ function render(s) {
   if ((st === "connected" && (lastState !== "connected" || s.transport !== lastTransport)) || (st === "disconnected" && lastState && lastState !== "disconnected")) setTimeout(checkIp, 600);
   lastState = st; lastTransport = s.transport;
   last = s;
+  markSteps(s);
+  if (!renderFacts.done) { renderFacts(s); renderFacts.done = true; }
 }
 
 async function poll() {
@@ -278,9 +332,47 @@ const chromeCmd = `open -na "Google Chrome" --args --proxy-server="http://${loca
 $("chromeCmd").textContent = chromeCmd;
 $("copyCmd").onclick = async () => { try { await navigator.clipboard.writeText(chromeCmd); $("copied").textContent = "copied"; } catch { $("copied").textContent = "select the text above and copy it"; } };
 
+// Demo walkthrough: each step ticks itself off from what the engine reports.
+const STEPS = [
+  ["real", "Show my real IP", "The \"Without VPN\" box: home network, Pakistan"],
+  ["conn", "Connect", "The engine races WireGuard and Shadowsocks; the first real handshake wins"],
+  ["exit", "Websites now see Singapore", "The IP matches my exit server; check it on Surfshark"],
+  ["ss", "Block WireGuard", "Firewall drops WireGuard; the engine falls back to Shadowsocks, still connected"],
+  ["wg", "Unblock", "Back on WireGuard, no user action"],
+  ["off", "Disconnect cleanly", "Routes, DNS and firewall rules restored; real IP again"],
+];
+let done = {};
+function markSteps(s) {
+  const tr = s.transport || "";
+  if (s.original_ip && !s.original_ip.error) done.real = true;
+  if (s.state === "connected") done.conn = true;
+  if (done.conn && s.state === "connected" && lastExitMatch) done.exit = true;
+  if (done.conn && s.state === "connected" && s.wg_blocked && tr.includes("shadowsocks")) done.ss = true;
+  if (done.ss && s.state === "connected" && !s.wg_blocked && tr.includes("wireguard")) done.wg = true;
+  if (done.conn && s.state === "disconnected" && !s.error) done.off = true;
+  const next = STEPS.findIndex(([k]) => !done[k]);
+  $("steps").innerHTML = STEPS.map(([k, t1, t2], i) =>
+    `<div class="step ${done[k] ? "done" : i === next ? "next" : ""}"><span class="dot">${done[k] ? "✓" : i + 1}</span><div><div class="t1">${esc(t1)}</div><div class="t2">${esc(t2)}</div></div></div>`).join("");
+}
+let lastExitMatch = false;
+$("resetSteps").onclick = ev => { ev.preventDefault(); done = {}; lastExitMatch = false; if (last) markSteps(last); };
+
+function renderFacts(s) {
+  const loc = (s && s.location) || locs[0] || {};
+  const facts = [
+    ["Engine", `TunnelCore (Go)${s && s.engine_version && s.engine_version !== "dev" ? " " + esc(s.engine_version) : ""}<br><span class="muted">same <code>mobile.Tunnel</code> API the Android and iOS apps call</span>`],
+    ["Transports", `WireGuard (UDP 51820)<br>Shadowsocks AEAD + TLS split (TCP 8388)`],
+    ["Exit server", `${flag(loc.country)} ${esc(loc.name || "")} · Oracle Cloud<br><span class="muted">${esc(loc.public_ip || "")}</span>`],
+    ["Leak protection", `DNS only inside the tunnel<br>IPv6 off while connected`],
+    ["Backend", `Go api · Node billing · Python prober<br>Go node agent on each server`],
+    ["Tested", `race detector · fuzzing · soak<br>load test on 1M users`],
+  ];
+  $("facts").innerHTML = facts.map(([k, v]) => `<div class="fact"><div class="k">${k}</div><div class="v">${v}</div></div>`).join("");
+}
+
 (async () => {
   try { locs = await api("/api/locations"); if (locs.length === 1) selected = locs[0].id; } catch {}
-  renderLocs(); poll(); checkIp(); loadProbes(); setInterval(loadProbes, 30000);
+  renderLocs(); renderFacts(null); poll(); checkIp(); loadProbes(); setInterval(loadProbes, 30000);
 })();
 </script>
 </body>
